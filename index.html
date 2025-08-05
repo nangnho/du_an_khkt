@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nhận Dạng Bệnh Lá Sầu Riêng</title>
+    <!-- Sử dụng Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- Style Tùy Chỉnh --- */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            background-image: radial-gradient(#d1d5db 0.5px, transparent 0.5px), radial-gradient(#d1d5db 0.5px, #f3f4f6 0.5px);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+        }
+
+        /* Hiệu ứng xuất hiện cho card chính */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .main-card {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+
+        /* Hiệu ứng cho vùng tải ảnh */
+        .upload-container {
+            transition: all 0.3s ease;
+        }
+        .upload-container.drag-over {
+            border-color: #4f46e5; /* Màu indigo-600 */
+            background-color: #eef2ff; /* Màu indigo-50 */
+            transform: scale(1.02);
+        }
+
+        /* Hiệu ứng cho nút */
+        #predict-btn {
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.39);
+        }
+        #predict-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px 0 rgba(79, 70, 229, 0.45);
+        }
+
+        /* Hiệu ứng cho kết quả và chi tiết */
+        #result-area, #details-area {
+            transition: all 0.5s ease-in-out;
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+        }
+        #result-area {
+             padding: 0 1.5rem;
+        }
+        #details-area {
+            margin-top: 0;
+        }
+
+        #result-area.visible, #details-area.visible {
+            max-height: 500px; /* Đủ lớn để chứa nội dung */
+            opacity: 1;
+        }
+        #result-area.visible {
+             padding: 1.5rem;
+             margin-top: 1.5rem;
+        }
+        #details-area.visible {
+            margin-top: 1rem;
+        }
+        
+        /* Màu sắc cho kết quả */
+        .result-healthy { background-color: #dcfce7; border-left: 4px solid #22c55e; }
+        .result-healthy #prediction-text { color: #166534; }
+
+        .result-disease { background-color: #feefea; border-left: 4px solid #f97316; }
+        .result-disease #prediction-text { color: #c2410c; }
+        
+        .result-error { background-color: #fee2e2; border-left: 4px solid #ef4444; }
+        .result-error #prediction-text { color: #b91c1c; }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="main-card bg-white w-full max-w-2xl mx-auto p-6 sm:p-8 rounded-2xl shadow-2xl">
+        <!-- Header -->
+        <div class="text-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">Trình Nhận Dạng Bệnh Lá Sầu Riêng</h1>
+            <p class="text-gray-500 mt-2">Sử dụng AI để chẩn đoán nhanh chóng và chính xác.</p>
+        </div>
+
+        <!-- Vùng tải ảnh lên -->
+        <div id="upload-area" class="mb-4">
+            <label for="file-upload" class="upload-container cursor-pointer flex justify-center w-full h-64 px-4 border-2 border-gray-300 border-dashed rounded-lg">
+                <div class="text-center flex flex-col items-center justify-center">
+                    <img id="image-preview" class="hidden max-h-56 mb-4 rounded-md shadow-sm" alt="Xem trước ảnh"/>
+                    <div id="placeholder">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                        </svg>
+                        <p class="mt-2 text-sm text-gray-600">
+                            <span class="font-semibold text-indigo-600">Nhấn để tải ảnh lên</span> hoặc kéo thả vào đây
+                        </p>
+                        <p class="text-xs text-gray-500 mt-1">Hỗ trợ: PNG, JPG, JPEG</p>
+                    </div>
+                </div>
+            </label>
+            <input id="file-upload" name="file-upload" type="file" class="sr-only" accept="image/png, image/jpeg, image/jpg">
+        </div>
+
+        <!-- Nút dự đoán -->
+        <div class="text-center">
+            <button id="predict-btn" disabled class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-3 px-10 rounded-lg shadow-md hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:shadow-none">
+                <span id="btn-text">Chẩn Đoán</span>
+                <span id="btn-spinner" class="hidden">
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Đang phân tích...
+                </span>
+            </button>
+        </div>
+
+        <!-- Vùng hiển thị kết quả -->
+        <div id="result-area" class="text-center rounded-lg">
+            <h2 class="text-xl font-semibold text-gray-800 mb-2">Kết quả chẩn đoán:</h2>
+            <p id="prediction-text" class="text-2xl font-bold"></p>
+            <p id="confidence-text" class="text-md text-gray-600 mt-1"></p>
+        </div>
+        
+        <!-- VÙNG HIỂN THỊ THÔNG TIN CHI TIẾT MỚI -->
+        <div id="details-area" class="text-left rounded-lg p-4 border border-gray-200 bg-gray-50">
+            <!-- Nguyên nhân -->
+            <div class="mb-4">
+                <h3 class="font-semibold text-lg text-gray-800 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Nguyên Nhân
+                </h3>
+                <p id="cause-text" class="text-gray-600 mt-1 pl-7 text-sm"></p>
+            </div>
+            <!-- Giải pháp -->
+            <div>
+                <h3 class="font-semibold text-lg text-gray-800 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Giải Pháp & Khắc Phục
+                </h3>
+                <p id="solution-text" class="text-gray-600 mt-1 pl-7 text-sm"></p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('upload-area');
+        const fileUpload = document.getElementById('file-upload');
+        const imagePreview = document.getElementById('image-preview');
+        const placeholder = document.getElementById('placeholder');
+        const predictBtn = document.getElementById('predict-btn');
+        const resultArea = document.getElementById('result-area');
+        const predictionText = document.getElementById('prediction-text');
+        const confidenceText = document.getElementById('confidence-text');
+        const btnText = document.getElementById('btn-text');
+        const btnSpinner = document.getElementById('btn-spinner');
+        const uploadContainer = document.querySelector('.upload-container');
+        // Các element mới
+        const detailsArea = document.getElementById('details-area');
+        const causeText = document.getElementById('cause-text');
+        const solutionText = document.getElementById('solution-text');
+
+        let selectedFile = null;
+
+        // --- CƠ SỞ DỮ LIỆU THÔNG TIN BỆNH ---
+        const diseaseInfo = {
+            'Bệnh Tảo Lá (Leaf Algal)': {
+                cause: 'Do tảo Cephaleuros virescens gây ra, phát triển mạnh trong điều kiện ẩm độ cao, vườn rậm rạp, thiếu ánh sáng.',
+                solution: 'Cắt tỉa cành tạo độ thông thoáng, bón phân cân đối. Phun các loại thuốc gốc đồng hoặc thuốc đặc trị nấm tảo.'
+            },
+            'Bệnh Cháy Lá (Leaf Blight)': {
+                cause: 'Do nấm Rhizoctonia solani gây ra, thường xuất hiện vào mùa mưa, lây lan nhanh khi độ ẩm không khí cao.',
+                solution: 'Thu gom và tiêu hủy lá bệnh. Sử dụng các loại thuốc trừ nấm có hoạt chất như Hexaconazole, Propiconazole.'
+            },
+            'Bệnh Thán Thư (Colletotrichum)': {
+                cause: 'Do nấm Colletotrichum gloeosporioides, phát triển khi thời tiết nóng ẩm, mưa nhiều, đặc biệt trên các lá non.',
+                solution: 'Cắt bỏ và tiêu hủy các bộ phận bị bệnh. Phun thuốc chứa hoạt chất Azoxystrobin, Propineb hoặc Mancozeb.'
+            },
+            'Lá Khỏe Mạnh (Healthy)': {
+                cause: 'Cây được chăm sóc tốt, đủ dinh dưỡng, ánh sáng và nước.',
+                solution: 'Tiếp tục duy trì chế độ chăm sóc hiện tại, kiểm tra vườn thường xuyên để phát hiện sâu bệnh sớm.'
+            },
+            'Bệnh Đốm Lá Phomopsis (Phomopsis)': {
+                cause: 'Do nấm Phomopsis durionis gây ra, thường tấn công trên lá già, gây ra các đốm nâu có viền vàng.',
+                solution: 'Vệ sinh vườn, cắt tỉa cành lá bị bệnh. Phun thuốc gốc đồng hoặc các thuốc có hoạt chất Metalaxyl, Mancozeb.'
+            },
+            'Bệnh Nấm Hồng (Rhizoctonia)': {
+                cause: 'Do nấm Corticium salmonicolor gây ra, phát triển mạnh trong mùa mưa, độ ẩm cao, tấn công trên cành và thân cây.',
+                solution: 'Cạo sạch vùng bị bệnh trên cành, thân và quét dung dịch thuốc gốc đồng. Cắt bỏ các cành bị nặng và tiêu hủy.'
+            }
+        };
+
+        // --- Xử lý kéo thả ---
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => uploadContainer.classList.add('drag-over'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => uploadContainer.classList.remove('drag-over'), false);
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                fileUpload.files = files;
+                handleFileSelect(files[0]);
+            }
+        }, false);
+
+        // --- Xử lý chọn file ---
+        fileUpload.addEventListener('change', (event) => {
+            if (event.target.files.length > 0) {
+                handleFileSelect(event.target.files[0]);
+            }
+        });
+
+        function handleFileSelect(file) {
+            selectedFile = file;
+            if (selectedFile) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imagePreview.src = e.target.result;
+                    imagePreview.classList.remove('hidden');
+                    placeholder.classList.add('hidden');
+                    predictBtn.disabled = false;
+                    resultArea.classList.remove('visible');
+                    detailsArea.classList.remove('visible'); // Ẩn chi tiết cũ
+                    resultArea.classList.remove('result-healthy', 'result-disease', 'result-error');
+                };
+                reader.readAsDataURL(selectedFile);
+            }
+        }
+
+        // --- Xử lý dự đoán ---
+        predictBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            btnText.classList.add('hidden');
+            btnSpinner.classList.remove('hidden');
+            predictBtn.disabled = true;
+            resultArea.classList.remove('visible');
+            detailsArea.classList.remove('visible');
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                const response = await fetch('http://127.0.0.1:5000/predict', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Lỗi từ server: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                displayResult(data.prediction, `Độ tin cậy: ${data.confidence}`, false);
+
+            } catch (error) {
+                console.error('Lỗi:', error);
+                displayResult('Không thể dự đoán', 'Vui lòng kiểm tra kết nối và thử lại.', true);
+            } finally {
+                btnText.classList.remove('hidden');
+                btnSpinner.classList.add('hidden');
+                predictBtn.disabled = false;
+            }
+        });
+        
+        function displayResult(prediction, confidence, isError) {
+            predictionText.textContent = prediction;
+            confidenceText.textContent = confidence;
+            
+            resultArea.classList.remove('result-healthy', 'result-disease', 'result-error');
+            detailsArea.classList.remove('visible');
+
+            if (isError) {
+                resultArea.classList.add('result-error');
+            } else {
+                const info = diseaseInfo[prediction];
+                if (info) {
+                    causeText.textContent = info.cause;
+                    solutionText.textContent = info.solution;
+                    // Chỉ hiển thị chi tiết nếu không phải là lá khỏe mạnh
+                    if (prediction.toLowerCase().indexOf('khỏe') === -1) {
+                         detailsArea.classList.add('visible');
+                    }
+                }
+                
+                if (prediction.toLowerCase().indexOf('khỏe') !== -1) {
+                    resultArea.classList.add('result-healthy');
+                } else {
+                    resultArea.classList.add('result-disease');
+                }
+            }
+            
+            resultArea.classList.add('visible');
+        }
+
+    </script>
+</body>
+</html>
